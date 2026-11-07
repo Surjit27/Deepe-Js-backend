@@ -7,6 +7,14 @@ export async function listRoles() {
   return rows
 }
 
+export async function listRolesByPortal(portal) {
+  const { rows } = await getPostgresPool().query(
+    `SELECT id, key, label, portal, created_at FROM roles WHERE portal = $1 ORDER BY created_at ASC`,
+    [portal],
+  )
+  return rows
+}
+
 export async function findRoleByKey(key) {
   const { rows } = await getPostgresPool().query(
     `SELECT id, key, label, portal, created_at FROM roles WHERE key = $1`,
