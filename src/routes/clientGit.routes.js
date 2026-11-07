@@ -7,9 +7,12 @@ import {
   getGitAccessStatus,
   getRepo,
   listCredentialRepositories,
+  listConnectedReposForCredential,
   listCredentials,
+  listExplorerConnectedBackends,
   listRepos,
   removeCredential,
+  setExplorerRepoConnected,
   startGitHubOAuth,
   updateCredential,
   verifyCredential,
@@ -73,6 +76,30 @@ clientGitRouter.post('/git/verify', ...clientOnly, async (req, res, next) => {
   try {
     const credentialId = req.body?.credentialId ?? req.query?.credentialId
     res.json(await verifyGitAccess(req.auth.userId, { credentialId }))
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientGitRouter.get('/git/connected-repos', ...clientOnly, async (req, res, next) => {
+  try {
+    res.json(await listExplorerConnectedBackends(req.auth.userId))
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientGitRouter.get('/git/credentials/:id/connected-repos', ...clientOnly, async (req, res, next) => {
+  try {
+    res.json(await listConnectedReposForCredential(req.auth.userId, req.params.id))
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientGitRouter.put('/git/connected-repos', ...clientOnly, async (req, res, next) => {
+  try {
+    res.json(await setExplorerRepoConnected(req.auth.userId, req.body ?? {}))
   } catch (err) {
     next(err)
   }

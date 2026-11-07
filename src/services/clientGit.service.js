@@ -10,6 +10,12 @@ import {
   listGitCredentials,
   updateGitCredential,
 } from '../repositories/clientGitCredentials.repository.js'
+import {
+  deleteConnectedRepo,
+  listConnectedRepoIdsForCredential,
+  listConnectedRepos,
+  upsertConnectedRepo,
+} from '../repositories/clientGitConnectedRepos.repository.js'
 import { findUserById } from '../repositories/users.repository.js'
 import { getGitHubRepo, listGitHubRepos, repoAccessLabel, verifyGitHubToken } from './githubApi.service.js'
 import {
@@ -258,6 +264,77 @@ export async function listRepos(userId, query = {}) {
   return { repos, source: resolved.source, credentialId: resolved.credentialId ?? null }
 }
 
+function toExplorerBackend(row) {
+  const meta = row.metadata ?? {}
+  return {
+    id: row.id,
+    credentialId: row.git_credential_id,
+    githubRepoId: Number(row.github_repo_id),
+    name: row.name || row.full_name.split('/').pop() || row.full_name,
+    repo: row.full_name,
+    branch: row.default_branch || 'main',
+    framework: row.language || meta.framework || '—',
+    private: row.private,
+    htmlUrl: row.html_url,
+    status: 'idle',
+    stats: null,
+    discoveredAt: null,
+    connectedAt: row.connected_at,
+  }
+}
+
+export async function listExplorerConnectedBackends(userId) {
+  const { schemaUserId } = await assertClientActor(userId)
+  await migrateClientSchemaIfNeeded(schemaUserId)
+  const rows = await listConnectedRepos(schemaUserId)
+  return { backends: rows.map(toExplorerBackend) }
+}
+
+export async function listConnectedReposForCredential(userId, credentialId) {
+  const { schemaUserId } = await assertClientActor(userId)
+  await migrateClientSchemaIfNeeded(schemaUserId)
+  const cred = await findGitCredentialById(schemaUserId, credentialId)
+  if (!cred) throw httpError(404, 'Git credential not found')
+  const githubRepoIds = await listConnectedRepoIdsForCredential(schemaUserId, credentialId)
+  return { credentialId, githubRepoIds: githubRepoIds.map(Number) }
+}
+
+export async function setExplorerRepoConnected(userId, body) {
+  const { schemaUserId } = await assertClientActor(userId)
+  await migrateClientSchemaIfNeeded(schemaUserId)
+
+  const credentialId = String(body?.credentialId ?? '')
+  const connected = body?.connected !== false
+  const githubRepoId = Number(body?.githubRepoId)
+  if (!credentialId) throw httpError(400, 'credentialId is required')
+  if (!Number.isFinite(githubRepoId) || githubRepoId <= 0) throw httpError(400, 'githubRepoId is required')
+
+  const cred = await findGitCredentialById(schemaUserId, credentialId)
+  if (!cred) throw httpError(404, 'Git credential not found')
+
+  if (!connected) {
+    await deleteConnectedRepo(schemaUserId, credentialId, githubRepoId)
+    return { connected: false, githubRepoId, credentialId }
+  }
+
+  const fullName = String(body?.fullName ?? '').trim()
+  const name = String(body?.name ?? '').trim() || fullName.split('/').pop() || fullName
+  if (!fullName.includes('/')) throw httpError(400, 'fullName must be owner/repo')
+
+  const row = await upsertConnectedRepo(schemaUserId, {
+    gitCredentialId: credentialId,
+    githubRepoId,
+    fullName,
+    name,
+    defaultBranch: String(body?.defaultBranch ?? 'main').trim() || 'main',
+    private: Boolean(body?.private),
+    htmlUrl: String(body?.htmlUrl ?? '').trim(),
+    language: String(body?.language ?? '').trim(),
+    metadata: body?.metadata && typeof body.metadata === 'object' ? body.metadata : {},
+  })
+  return { connected: true, backend: toExplorerBackend(row) }
+}
+
 export async function listCredentialRepositories(userId, credentialId, query = {}) {
   const { schemaUserId } = await assertClientActor(userId)
   const row = await findGitCredentialById(schemaUserId, credentialId)
@@ -283,6 +360,8 @@ export async function listCredentialRepositories(userId, credentialId, query = {
     repos = repos.filter((r) => r.private)
   }
 
+  const connectedIdSet = new Set(await listConnectedRepoIdsForCredential(schemaUserId, credentialId))
+
   const stats = {
     total: collected.length,
     private: collected.filter((r) => r.private).length,
@@ -304,7 +383,10 @@ export async function listCredentialRepositories(userId, credentialId, query = {
       avatarUrl: profile.avatarUrl,
     },
     stats,
-    repos,
+    repos: repos.map((r) => ({
+      ...r,
+      connectedToExplorer: connectedIdSet.has(String(r.id)),
+    })),
   }
 }
 
