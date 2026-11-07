@@ -42,4 +42,9 @@ export const env = {
     adminName: process.env.ADMIN_NAME ?? 'Platform Admin',
   },
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? '',
+  /** Dev/fallback GitHub PAT when tenant has no stored credential (private repos). */
+  github: {
+    accountEmail: (process.env.GITHUB_ACCOUNT_EMAIL ?? '').trim().toLowerCase(),
+    token: (process.env.GITHUB_TOKEN ?? process.env.GITHUB_PAT ?? '').trim(),
+  },
 }
