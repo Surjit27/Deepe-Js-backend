@@ -72,10 +72,13 @@ User accounts live in **PostgreSQL** (`users` table: `admin` | `client` roles). 
 
 **Two portals (same idea as Ad-portal, role-only):**
 
-| Portal | Frontend host | `X-App-Surface` | Who can log in |
-|--------|---------------|-----------------|----------------|
+| Surface | Frontend host | `X-App-Surface` | Who can log in |
+|---------|---------------|-----------------|----------------|
+| Home (public) | `home.localhost` | `home` | Client **sign-in / sign-up** only (`POST /api/auth/signup` requires `X-App-Surface: home`) |
+| Client | `client.localhost` | `client` | `client` users only |
 | Admin | `admin.localhost` | `admin` | `admin` users only |
-| Client | `localhost` | `client` | `client` users only |
+
+Dev: `npm run dev` in `Frontend/`, then open **http://home.localhost:5173**, **http://client.localhost:5173**, or **http://admin.localhost:5173**. Plain **http://localhost:5173** redirects to `client.localhost`.
 
 Login rejects wrong role for the portal. Authenticated routes also require `req.auth.role` to match `X-App-Surface`. Admin user APIs require admin portal + admin role.
 

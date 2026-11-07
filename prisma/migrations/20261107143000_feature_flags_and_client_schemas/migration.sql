@@ -33,7 +33,7 @@ INSERT INTO feature_flags (key, label, description, nav_path, sort_order) VALUES
   ('client.monitor', 'Execution monitor', 'Run history and status', '/monitor', 40),
   ('client.git', 'Git integration', 'Repository linking', '/git', 50),
   ('client.assistant', 'AI assistant', 'In-app assistant', '/assistant', 60),
-  ('client.backends', 'Other backends', 'Additional backend workspaces', '/backends', 70),
+  ('client.backends', 'Other backends', 'Additional backend workspaces', '/backends/auth', 70),
   ('client.account', 'Account', 'Profile and account', '/account', 80),
   ('client.settings', 'Settings', 'Client preferences', '/settings', 90)
 ON CONFLICT (key) DO NOTHING;

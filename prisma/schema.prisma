@@ -13,15 +13,18 @@ datasource db {
 
 /// Portal account. Client-owned models should reference this id.
 model User {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  role         String   @db.VarChar(40)
-  displayName  String   @default("") @map("display_name") @db.VarChar(255)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String   @unique @db.VarChar(255)
+  passwordHash   String   @map("password_hash") @db.VarChar(255)
+  role           String   @db.VarChar(40)
+  accessRoleKey  String   @default("super_admin") @map("access_role_key") @db.VarChar(40)
+  tenantOwnerId  String?  @map("tenant_owner_id") @db.Uuid
+  displayName    String   @default("") @map("display_name") @db.VarChar(255)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([role], map: "idx_users_role")
+  @@index([tenantOwnerId], map: "idx_users_tenant_owner")
   @@map("users")
 }
 

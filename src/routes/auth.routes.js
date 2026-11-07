@@ -11,6 +11,7 @@ import {
   listRoleCatalog,
   login,
   registerUser,
+  signUpClient,
   revokeAccessToken,
   startClientImpersonation,
 } from '../services/auth.service.js'
@@ -18,7 +19,15 @@ import {
 export const authRouter = Router()
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 12, name: 'login' })
+const signupLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 8, name: 'signup' })
 const exchangeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, name: 'impersonate-exchange' })
+
+function readAppSurface(req) {
+  const raw = String(req.headers['x-app-surface'] ?? req.headers['X-App-Surface'] ?? 'client').toLowerCase()
+  if (raw === 'admin') return 'admin'
+  if (raw === 'home') return 'home'
+  return 'client'
+}
 
 authRouter.post('/login', loginLimiter, async (req, res, next) => {
   try {
@@ -27,10 +36,7 @@ authRouter.post('/login', loginLimiter, async (req, res, next) => {
     if (!email || !password) {
       return res.status(400).json({ error: 'email and password are required' })
     }
-    const surface =
-      String(req.headers['x-app-surface'] ?? req.headers['X-App-Surface'] ?? 'client').toLowerCase() === 'admin'
-        ? 'admin'
-        : 'client'
+    const surface = readAppSurface(req)
     const result = await login(email, password, surface)
     recordAuditEvent({
       domain: AUDIT_DOMAIN.USER,
@@ -52,6 +58,31 @@ authRouter.post('/login', loginLimiter, async (req, res, next) => {
       subjectLabel: String(req.body?.email ?? '').trim().toLowerCase(),
       metadata: { portal: String(req.headers['x-app-surface'] ?? 'client').toLowerCase() },
     })
+    next(err)
+  }
+})
+
+authRouter.post('/signup', signupLimiter, async (req, res, next) => {
+  try {
+    const surface = readAppSurface(req)
+    if (surface !== 'home') {
+      return res.status(403).json({ error: 'Client sign-up is only available on the home site' })
+    }
+    const { email, password, displayName } = req.body ?? {}
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' })
+    }
+    const result = await signUpClient({ email, password, displayName })
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.USER_CREATED,
+      actorUserId: result.user.id,
+      subjectId: result.user.id,
+      subjectLabel: result.user.email,
+      metadata: { role: 'client', source: 'home_signup' },
+    })
+    res.status(201).json(result)
+  } catch (err) {
     next(err)
   }
 })

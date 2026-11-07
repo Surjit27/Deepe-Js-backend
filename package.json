@@ -8,10 +8,11 @@
     "node": ">=20"
   },
   "scripts": {
+    "start": "prisma migrate deploy && node --watch src/server.js",
     "dev": "prisma migrate deploy && node src/server.js",
     "postinstall": "prisma generate",
     "dev:watch": "node --watch src/server.js",
-    "start": "node src/server.js",
+    "start:prod": "node src/server.js",
     "db:migrate": "node src/db/migrate.js",
     "docker:db": "docker compose up -d postgres mongo",
     "docker:up": "docker compose up --build",

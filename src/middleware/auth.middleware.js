@@ -47,7 +47,7 @@ function readAppSurface(req) {
     : 'client'
 }
 
-/** JWT role must match the portal indicated by X-App-Surface (admin.localhost vs localhost). */
+/** JWT role must match the portal indicated by X-App-Surface (admin vs client portals). */
 export function requireRoleMatchesPortal(req, res, next) {
   if (!req.auth) {
     return res.status(401).json({ error: 'Authentication required' })

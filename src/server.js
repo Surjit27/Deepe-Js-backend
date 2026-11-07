@@ -3,7 +3,7 @@ import { env } from './config/env.js'
 import { closeDatabases, connectDatabases } from './db/index.js'
 import { runMigrations } from './db/migrate.js'
 import { applyPrismaMigrations } from './db/prisma.js'
-import { seedAdminUser } from './db/seed.js'
+import { seedAdminUser, seedClientAccessRoles } from './db/seed.js'
 import { startJobRunner, stopJobRunner } from './jobs/runner.js'
 
 async function main() {
@@ -11,6 +11,7 @@ async function main() {
   await connectDatabases()
   await runMigrations()
   await seedAdminUser()
+  await seedClientAccessRoles()
   console.log('[db] PostgreSQL and MongoDB connected')
   await startJobRunner(env.redisUrl)
 

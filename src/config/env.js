@@ -15,7 +15,8 @@ export const env = {
   nodeEnv,
   isProd: nodeEnv === 'production',
   port: Number(process.env.PORT ?? 4000),
-  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://admin.localhost:5173')
+  corsOrigins: (process.env.CORS_ORIGIN ??
+    'http://home.localhost:5173,http://client.localhost:5173,http://admin.localhost:5173,http://localhost:5173')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
@@ -41,4 +42,15 @@ export const env = {
     adminName: process.env.ADMIN_NAME ?? 'Platform Admin',
   },
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? '',
+  /** GitHub: env PAT fallback + OAuth app (private repos, future PRs). */
+  github: {
+    accountEmail: (process.env.GITHUB_ACCOUNT_EMAIL ?? '').trim().toLowerCase(),
+    token: (process.env.GITHUB_TOKEN ?? process.env.GITHUB_PAT ?? '').trim(),
+    clientId: (process.env.GITHUB_CLIENT_ID ?? '').trim(),
+    clientSecret: (process.env.GITHUB_CLIENT_SECRET ?? '').trim(),
+    oauthRedirectUri: (process.env.GITHUB_OAUTH_REDIRECT_URI ?? '').trim(),
+    oauthSuccessUrl:
+      (process.env.GITHUB_OAUTH_SUCCESS_URL ?? '').trim() ||
+      (process.env.CORS_ORIGIN ?? 'http://client.localhost:5173').split(',')[0].trim() + '/integrations/github',
+  },
 }
