@@ -1,12 +1,16 @@
 import { Router } from 'express'
 import { authenticate, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 import {
+  completeGitHubOAuthCallback,
+  completeGitHubOAuthCallbackWithError,
   createCredential,
   getGitAccessStatus,
   getRepo,
+  listCredentialRepositories,
   listCredentials,
   listRepos,
   removeCredential,
+  startGitHubOAuth,
   updateCredential,
   verifyCredential,
   verifyGitAccess,
@@ -74,6 +78,14 @@ clientGitRouter.post('/git/verify', ...clientOnly, async (req, res, next) => {
   }
 })
 
+clientGitRouter.get('/git/credentials/:id/repositories', ...clientOnly, async (req, res, next) => {
+  try {
+    res.json(await listCredentialRepositories(req.auth.userId, req.params.id, req.query ?? {}))
+  } catch (err) {
+    next(err)
+  }
+})
+
 clientGitRouter.get('/git/repos', ...clientOnly, async (req, res, next) => {
   try {
     res.json(await listRepos(req.auth.userId, req.query ?? {}))
@@ -87,5 +99,34 @@ clientGitRouter.get('/git/repos/:owner/:repo', ...clientOnly, async (req, res, n
     res.json(await getRepo(req.auth.userId, req.params.owner, req.params.repo, req.query ?? {}))
   } catch (err) {
     next(err)
+  }
+})
+
+clientGitRouter.post('/git/oauth/start', ...clientOnly, async (req, res, next) => {
+  try {
+    res.json(await startGitHubOAuth(req.auth.userId))
+  } catch (err) {
+    next(err)
+  }
+})
+
+/** Public callback — identity comes from signed `state`, not JWT. */
+clientGitRouter.get('/git/oauth/callback', async (req, res, next) => {
+  try {
+    const code = req.query?.code
+    const state = req.query?.state
+    if (!code || !state) {
+      const redirect = await completeGitHubOAuthCallbackWithError('Missing authorization code')
+      return res.redirect(redirect)
+    }
+    const redirect = await completeGitHubOAuthCallback(String(code), String(state))
+    res.redirect(redirect)
+  } catch (err) {
+    try {
+      const redirect = await completeGitHubOAuthCallbackWithError(err.message ?? 'GitHub sign-in failed')
+      res.redirect(redirect)
+    } catch (e) {
+      next(e)
+    }
   }
 })

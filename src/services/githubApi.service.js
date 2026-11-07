@@ -78,8 +78,16 @@ export async function listGitHubRepos(token, { page = 1, perPage = 30, sort = 'u
       description: r.description ?? '',
       language: r.language ?? '',
       updatedAt: r.updated_at,
+      permissions: r.permissions ?? {},
     })),
   }
+}
+
+export function repoAccessLabel(permissions = {}) {
+  if (permissions.admin) return 'admin'
+  if (permissions.push) return 'write'
+  if (permissions.pull) return 'read'
+  return 'none'
 }
 
 export async function getGitHubRepo(token, owner, repo) {
