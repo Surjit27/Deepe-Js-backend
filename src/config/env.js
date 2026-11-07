@@ -15,7 +15,8 @@ export const env = {
   nodeEnv,
   isProd: nodeEnv === 'production',
   port: Number(process.env.PORT ?? 4000),
-  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://admin.localhost:5173')
+  corsOrigins: (process.env.CORS_ORIGIN ??
+    'http://home.localhost:5173,http://client.localhost:5173,http://admin.localhost:5173,http://localhost:5173')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),

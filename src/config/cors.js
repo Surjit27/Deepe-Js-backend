@@ -16,7 +16,10 @@ export function isCorsOriginAllowed(origin, allowList, isProd) {
       host === 'localhost' ||
       host === '127.0.0.1' ||
       host.endsWith('.localhost') ||
-      host === 'admin.localhost'
+      host.endsWith('.localhost.com') ||
+      host === 'client.localhost' ||
+      host === 'admin.localhost' ||
+      host === 'home.localhost'
     const okPort = url.port === '' || url.port === '5173' || url.port === '4173'
     return okHost && okPort && url.protocol === 'http:'
   } catch {

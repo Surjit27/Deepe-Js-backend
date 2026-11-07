@@ -4,7 +4,13 @@ import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { createRole, findRoleByKey, listRoles, toPublicRole } from '../repositories/roles.repository.js'
 import { createUser, findUserByEmail, findUserById, listUsers, toPublicUser } from '../repositories/users.repository.js'
-import { consumeImpersonationCode, isJtiRevoked, issueImpersonationCode, revokeJti } from './tokenStore.js'
+import {
+  consumeImpersonationCode,
+  isJtiRevoked,
+  issueImpersonationCode,
+  revokeJti,
+} from './tokenStore.js'
+import { provisionClientSchema } from '../db/clientSchema/provision.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -41,6 +47,10 @@ export function revokeAccessToken(payload) {
   revokeJti(payload?.jti, payload?.exp)
 }
 
+function loginPortalForSurface(appSurface) {
+  return appSurface === 'home' ? 'client' : appSurface
+}
+
 export async function login(email, password, appSurface) {
   const normalizedEmail = String(email).trim().toLowerCase()
   const normalizedPassword = String(password)
@@ -62,17 +72,61 @@ export async function login(email, password, appSurface) {
     throw err
   }
   const publicUser = toPublicUser(user)
-  if (publicUser.portal !== appSurface) {
+  const portalForLogin = loginPortalForSurface(appSurface)
+  if (publicUser.portal !== portalForLogin) {
     const err = new Error(
       publicUser.portal === 'admin'
-        ? 'This account must sign in at admin.localhost'
-        : 'This account must sign in at localhost, not admin.localhost',
+        ? 'Admin accounts cannot sign in here. Use the admin console.'
+        : 'This account must sign in at client.localhost, not admin.localhost',
     )
     err.status = 403
     throw err
   }
   const token = signAccessToken(publicUser)
-  return { token, user: publicUser }
+  const result = { token, user: publicUser }
+  if (appSurface === 'home') {
+    result.handoffCode = issueImpersonationCode({ userId: publicUser.id })
+  }
+  return result
+}
+
+export async function signUpClient({ email, password, displayName }) {
+  const normalizedEmail = String(email).trim().toLowerCase()
+  if (!EMAIL_RE.test(normalizedEmail)) {
+    const err = new Error('Enter a valid email address')
+    err.status = 400
+    throw err
+  }
+  if (String(password).length < 8) {
+    const err = new Error('Password must be at least 8 characters')
+    err.status = 400
+    throw err
+  }
+  const roleRow = await findRoleByKey('client')
+  if (!roleRow) {
+    const err = new Error('Client sign-up is not available')
+    err.status = 503
+    throw err
+  }
+  const existing = await findUserByEmail(normalizedEmail)
+  if (existing) {
+    const err = new Error('Email already registered')
+    err.status = 409
+    throw err
+  }
+  const passwordHash = await bcrypt.hash(password, 12)
+  const user = await createUser({
+    email: normalizedEmail,
+    passwordHash,
+    role: 'client',
+    displayName: displayName?.trim() || normalizedEmail.split('@')[0],
+  })
+  const publicUser = toPublicUser(user)
+  provisionClientSchema(user.id).catch((err) => console.error('[client-schema] provision failed', user.id, err.message))
+  return {
+    user: publicUser,
+    handoffCode: issueImpersonationCode({ userId: publicUser.id }),
+  }
 }
 
 export async function getProfile(userId) {
@@ -177,7 +231,7 @@ export async function startClientImpersonation(adminUserId, targetUserId) {
 export async function exchangeImpersonationCode(code) {
   const row = consumeImpersonationCode(String(code ?? ''))
   if (!row) {
-    const err = new Error('Impersonation link expired or already used')
+    const err = new Error('Session link expired or already used')
     err.status = 401
     throw err
   }
@@ -188,14 +242,18 @@ export async function exchangeImpersonationCode(code) {
     throw err
   }
   const publicUser = toPublicUser(target)
-  const token = signAccessToken(publicUser, {
-    expiresIn: '2h',
-    impersonatedBy: row.adminId,
-  })
-  return {
-    token,
-    user: { ...publicUser, impersonatedBy: row.adminId, impersonation: true },
+  if (row.adminId) {
+    const token = signAccessToken(publicUser, {
+      expiresIn: '2h',
+      impersonatedBy: row.adminId,
+    })
+    return {
+      token,
+      user: { ...publicUser, impersonatedBy: row.adminId, impersonation: true },
+    }
   }
+  const token = signAccessToken(publicUser)
+  return { token, user: publicUser }
 }
 
 export async function listAccounts(actorRole, { role } = {}) {

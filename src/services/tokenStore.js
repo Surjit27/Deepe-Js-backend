@@ -19,9 +19,10 @@ export function isJtiRevoked(jti) {
 
 const codes = new Map()
 
-export function issueImpersonationCode({ userId, adminId, ttlMs = 60_000 }) {
+/** @param {{ userId: string, adminId?: string | null, ttlMs?: number }} opts */
+export function issueImpersonationCode({ userId, adminId = null, ttlMs = 60_000 }) {
   const code = crypto.randomUUID().replaceAll('-', '')
-  codes.set(code, { userId, adminId, exp: Date.now() + ttlMs })
+  codes.set(code, { userId, adminId: adminId ?? null, exp: Date.now() + ttlMs })
   return code
 }
 
