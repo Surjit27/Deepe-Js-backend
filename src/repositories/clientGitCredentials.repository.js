@@ -1,14 +1,16 @@
 import { getPostgresPool } from '../db/postgres.js'
 import { clientSchemaName } from '../db/clientSchema/provision.js'
 
+const CREDENTIAL_COLUMNS = `id, provider, account_email, label, token_cipher, is_default, last_verified_at,
+            last_github_login, metadata, auth_method, scopes, token_expires_at, created_at, updated_at`
+
 function schema(clientUserId) {
   return clientSchemaName(clientUserId)
 }
 
 export async function listGitCredentials(clientUserId) {
   const { rows } = await getPostgresPool().query(
-    `SELECT id, provider, account_email, label, token_cipher, is_default, last_verified_at,
-            last_github_login, metadata, created_at, updated_at
+    `SELECT ${CREDENTIAL_COLUMNS}
      FROM ${schema(clientUserId)}.git_credentials
      ORDER BY is_default DESC, created_at ASC`,
   )
@@ -17,8 +19,7 @@ export async function listGitCredentials(clientUserId) {
 
 export async function findGitCredentialById(clientUserId, id) {
   const { rows } = await getPostgresPool().query(
-    `SELECT id, provider, account_email, label, token_cipher, is_default, last_verified_at,
-            last_github_login, metadata, created_at, updated_at
+    `SELECT ${CREDENTIAL_COLUMNS}
      FROM ${schema(clientUserId)}.git_credentials
      WHERE id = $1`,
     [id],
@@ -26,10 +27,20 @@ export async function findGitCredentialById(clientUserId, id) {
   return rows[0] ?? null
 }
 
+export async function findGitCredentialByEmail(clientUserId, provider, accountEmail) {
+  const { rows } = await getPostgresPool().query(
+    `SELECT ${CREDENTIAL_COLUMNS}
+     FROM ${schema(clientUserId)}.git_credentials
+     WHERE provider = $1 AND lower(account_email) = lower($2)
+     LIMIT 1`,
+    [provider ?? 'github', accountEmail],
+  )
+  return rows[0] ?? null
+}
+
 export async function findDefaultGitCredential(clientUserId) {
   const { rows } = await getPostgresPool().query(
-    `SELECT id, provider, account_email, label, token_cipher, is_default, last_verified_at,
-            last_github_login, metadata, created_at, updated_at
+    `SELECT ${CREDENTIAL_COLUMNS}
      FROM ${schema(clientUserId)}.git_credentials
      WHERE is_default = true
      ORDER BY updated_at DESC
@@ -44,9 +55,10 @@ export async function insertGitCredential(clientUserId, row) {
   }
   const { rows } = await getPostgresPool().query(
     `INSERT INTO ${schema(clientUserId)}.git_credentials
-       (provider, account_email, label, token_cipher, is_default, last_github_login, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
-     RETURNING id, provider, account_email, label, is_default, last_verified_at, last_github_login, metadata, created_at, updated_at`,
+       (provider, account_email, label, token_cipher, is_default, last_github_login, metadata, auth_method, scopes, token_expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)
+     RETURNING id, provider, account_email, label, is_default, last_verified_at, last_github_login, metadata,
+               auth_method, scopes, token_expires_at, created_at, updated_at`,
     [
       row.provider ?? 'github',
       row.accountEmail.toLowerCase(),
@@ -55,6 +67,9 @@ export async function insertGitCredential(clientUserId, row) {
       Boolean(row.isDefault),
       row.lastGithubLogin ?? '',
       JSON.stringify(row.metadata ?? {}),
+      row.authMethod ?? 'pat',
+      row.scopes ?? '',
+      row.tokenExpiresAt ?? null,
     ],
   )
   return rows[0]
@@ -75,9 +90,13 @@ export async function updateGitCredential(clientUserId, id, patch) {
          last_verified_at = COALESCE($6, last_verified_at),
          last_github_login = COALESCE($7, last_github_login),
          metadata = COALESCE($8::jsonb, metadata),
+         auth_method = COALESCE($9, auth_method),
+         scopes = COALESCE($10, scopes),
+         token_expires_at = COALESCE($11, token_expires_at),
          updated_at = NOW()
      WHERE id = $1
-     RETURNING id, provider, account_email, label, is_default, last_verified_at, last_github_login, metadata, created_at, updated_at`,
+     RETURNING id, provider, account_email, label, is_default, last_verified_at, last_github_login, metadata,
+               auth_method, scopes, token_expires_at, created_at, updated_at`,
     [
       id,
       patch.accountEmail?.toLowerCase() ?? null,
@@ -87,6 +106,9 @@ export async function updateGitCredential(clientUserId, id, patch) {
       patch.lastVerifiedAt ?? null,
       patch.lastGithubLogin ?? null,
       patch.metadata == null ? null : JSON.stringify(patch.metadata),
+      patch.authMethod ?? null,
+      patch.scopes ?? null,
+      patch.tokenExpiresAt ?? null,
     ],
   )
   return rows[0] ?? null

@@ -4,13 +4,21 @@ import { decryptSecret, encryptSecret } from '../lib/secretBox.js'
 import {
   deleteGitCredential,
   findDefaultGitCredential,
+  findGitCredentialByEmail,
   findGitCredentialById,
   insertGitCredential,
   listGitCredentials,
   updateGitCredential,
 } from '../repositories/clientGitCredentials.repository.js'
 import { findUserById } from '../repositories/users.repository.js'
-import { getGitHubRepo, listGitHubRepos, verifyGitHubToken } from './githubApi.service.js'
+import { getGitHubRepo, listGitHubRepos, repoAccessLabel, verifyGitHubToken } from './githubApi.service.js'
+import {
+  buildGitHubAuthorizeUrl,
+  createGitHubOAuthState,
+  exchangeGitHubOAuthCode,
+  isGitHubOAuthEnabled,
+  parseGitHubOAuthState,
+} from './githubOAuth.service.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -32,10 +40,13 @@ function toPublicCredential(row, { tokenCipherPresent } = {}) {
     provider: row.provider,
     accountEmail: row.account_email,
     label: row.label,
+    authMethod: row.auth_method ?? 'pat',
+    scopes: row.scopes ?? '',
     isDefault: row.is_default,
     tokenSet: hasCipher,
     lastVerifiedAt: row.last_verified_at,
     lastGithubLogin: row.last_github_login,
+    tokenExpiresAt: row.token_expires_at ?? null,
     metadata: row.metadata ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -105,6 +116,7 @@ export async function getGitAccessStatus(userId) {
   return {
     envConfigured: Boolean(envCred),
     envAccountEmail: envCred?.accountEmail ?? '',
+    oauthEnabled: isGitHubOAuthEnabled(),
     credentialCount: rows.length,
     defaultCredentialId: defaultRow?.id ?? null,
     canAccessGit: Boolean(envCred || rows.some((r) => r.token_cipher)),
@@ -144,16 +156,34 @@ export async function createCredential(userId, body) {
     throw httpError(err.status === 403 ? 403 : 400, err.message ?? 'Token could not access GitHub')
   }
 
-  const row = await insertGitCredential(schemaUserId, {
-    accountEmail,
-    label,
-    tokenCipher: encryptSecret(token),
-    isDefault,
-    lastGithubLogin: verified.login,
-    metadata: { verifiedEmail: verified.email, githubUserId: verified.id },
-  })
-  const refreshed = await updateGitCredential(schemaUserId, row.id, { lastVerifiedAt: new Date() })
-  return { credential: toPublicCredential(refreshed ?? row) }
+  const tokenCipher = encryptSecret(token)
+  const existing = await findGitCredentialByEmail(schemaUserId, 'github', accountEmail)
+  let row
+  if (existing) {
+    row = await updateGitCredential(schemaUserId, existing.id, {
+      label: label || existing.label,
+      tokenCipher,
+      isDefault,
+      authMethod: 'pat',
+      scopes: 'pat',
+      lastGithubLogin: verified.login,
+      lastVerifiedAt: new Date(),
+      metadata: { verifiedEmail: verified.email, githubUserId: verified.id },
+    })
+  } else {
+    row = await insertGitCredential(schemaUserId, {
+      accountEmail,
+      label,
+      tokenCipher,
+      isDefault,
+      authMethod: 'pat',
+      scopes: 'pat',
+      lastGithubLogin: verified.login,
+      metadata: { verifiedEmail: verified.email, githubUserId: verified.id },
+    })
+    row = await updateGitCredential(schemaUserId, row.id, { lastVerifiedAt: new Date() })
+  }
+  return { credential: toPublicCredential(row), updated: Boolean(existing) }
 }
 
 export async function updateCredential(userId, credentialId, body) {
@@ -221,7 +251,61 @@ export async function listRepos(userId, query = {}) {
   const { schemaUserId } = await assertClientActor(userId)
   const resolved = await resolveCredential(schemaUserId, { credentialId: query.credentialId })
   const payload = await listGitHubRepos(resolved.token, { page: query.page, perPage: query.perPage })
-  return { ...payload, source: resolved.source, credentialId: resolved.credentialId ?? null }
+  let { repos } = payload
+  if (query.privateOnly === 'true' || query.privateOnly === true) {
+    repos = repos.filter((r) => r.private)
+  }
+  return { repos, source: resolved.source, credentialId: resolved.credentialId ?? null }
+}
+
+export async function listCredentialRepositories(userId, credentialId, query = {}) {
+  const { schemaUserId } = await assertClientActor(userId)
+  const row = await findGitCredentialById(schemaUserId, credentialId)
+  if (!row) throw httpError(404, 'Git credential not found')
+  const resolved = await resolveCredential(schemaUserId, { credentialId })
+  const profile = await verifyGitHubToken(resolved.token)
+
+  const perPage = 100
+  let page = 1
+  let collected = []
+  for (let i = 0; i < 5; i++) {
+    const batch = await listGitHubRepos(resolved.token, { page, perPage })
+    collected = collected.concat(batch.repos)
+    if (batch.repos.length < perPage) break
+    page += 1
+  }
+
+  let repos = collected.map((r) => ({
+    ...r,
+    access: repoAccessLabel(r.permissions),
+  }))
+  if (query.privateOnly === 'true' || query.privateOnly === true) {
+    repos = repos.filter((r) => r.private)
+  }
+
+  const stats = {
+    total: collected.length,
+    private: collected.filter((r) => r.private).length,
+    public: collected.filter((r) => !r.private).length,
+    read: collected.filter((r) => repoAccessLabel(r.permissions) === 'read').length,
+    write: collected.filter((r) => ['write', 'admin'].includes(repoAccessLabel(r.permissions))).length,
+  }
+
+  return {
+    credentialId,
+    accountEmail: row.account_email,
+    authMethod: row.auth_method ?? 'pat',
+    lastGithubLogin: row.last_github_login,
+    scopes: row.scopes ?? '',
+    profile: {
+      login: profile.login,
+      name: profile.name,
+      email: profile.email,
+      avatarUrl: profile.avatarUrl,
+    },
+    stats,
+    repos,
+  }
 }
 
 export async function getRepo(userId, owner, repo, query = {}) {
@@ -229,4 +313,71 @@ export async function getRepo(userId, owner, repo, query = {}) {
   const resolved = await resolveCredential(schemaUserId, { credentialId: query.credentialId })
   const repository = await getGitHubRepo(resolved.token, owner, repo)
   return { repo: repository, source: resolved.source, credentialId: resolved.credentialId ?? null }
+}
+
+async function saveOAuthCredential(schemaUserId, { accessToken, scope }, verified) {
+  const primaryEmail =
+    verified.emails?.find((e) => e.primary && e.verified)?.email ||
+    verified.emails?.[0]?.email ||
+    verified.email ||
+    `${verified.login}@users.noreply.github.com`
+  const accountEmail = primaryEmail.toLowerCase()
+  const tokenCipher = encryptSecret(accessToken)
+  const patch = {
+    label: `GitHub @${verified.login}`,
+    tokenCipher,
+    isDefault: true,
+    authMethod: 'oauth',
+    scopes: scope,
+    lastGithubLogin: verified.login,
+    lastVerifiedAt: new Date(),
+    metadata: {
+      verifiedEmail: verified.email,
+      githubUserId: verified.id,
+      avatarUrl: verified.avatarUrl,
+    },
+  }
+  const existing = await findGitCredentialByEmail(schemaUserId, 'github', accountEmail)
+  if (existing) {
+    return updateGitCredential(schemaUserId, existing.id, patch)
+  }
+  const row = await insertGitCredential(schemaUserId, {
+    accountEmail,
+    label: patch.label,
+    tokenCipher: patch.tokenCipher,
+    isDefault: true,
+    authMethod: 'oauth',
+    scopes: scope,
+    lastGithubLogin: verified.login,
+    metadata: patch.metadata,
+  })
+  return updateGitCredential(schemaUserId, row.id, { lastVerifiedAt: patch.lastVerifiedAt })
+}
+
+export async function startGitHubOAuth(userId) {
+  const { actor, schemaUserId } = await assertClientActor(userId)
+  assertSuperAdmin(actor)
+  if (!isGitHubOAuthEnabled()) {
+    throw httpError(503, 'GitHub sign-in is not configured. Set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and GITHUB_OAUTH_REDIRECT_URI.')
+  }
+  const state = createGitHubOAuthState({ userId: actor.id, tenantSchemaUserId: schemaUserId })
+  return { authorizeUrl: buildGitHubAuthorizeUrl(state) }
+}
+
+export async function completeGitHubOAuthCallback(code, state) {
+  const { tenantSchemaUserId } = parseGitHubOAuthState(state)
+  const exchanged = await exchangeGitHubOAuthCode(code)
+  const verified = await verifyGitHubToken(exchanged.accessToken)
+  await migrateClientSchemaIfNeeded(tenantSchemaUserId)
+  await saveOAuthCredential(tenantSchemaUserId, exchanged, verified)
+  const success = new URL(env.github.oauthSuccessUrl)
+  success.searchParams.set('github', 'connected')
+  return success.toString()
+}
+
+export async function completeGitHubOAuthCallbackWithError(message) {
+  const url = new URL(env.github.oauthSuccessUrl)
+  url.searchParams.set('github', 'error')
+  url.searchParams.set('message', message.slice(0, 200))
+  return url.toString()
 }
