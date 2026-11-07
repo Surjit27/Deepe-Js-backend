@@ -31,3 +31,13 @@ export async function seedAdminUser() {
   )
   console.log(`[seed] admin ready: ${email} (dev password synced from ADMIN_PASSWORD)`)
 }
+
+export async function seedClientAccessRoles() {
+  const pool = getPostgresPool()
+  await pool.query(
+    `INSERT INTO roles (key, label, portal) VALUES
+      ('super_admin', 'Super admin', 'client'),
+      ('member', 'Member', 'client')
+     ON CONFLICT (key) DO NOTHING`,
+  )
+}

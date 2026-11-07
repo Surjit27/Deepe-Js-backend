@@ -3,7 +3,14 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { createRole, findRoleByKey, listRoles, toPublicRole } from '../repositories/roles.repository.js'
-import { createUser, findUserByEmail, findUserById, listUsers, toPublicUser } from '../repositories/users.repository.js'
+import {
+  createUser,
+  findUserByEmail,
+  findUserById,
+  listUsers,
+  toPublicUser,
+} from '../repositories/users.repository.js'
+import { getPostgresPool } from '../db/postgres.js'
 import {
   consumeImpersonationCode,
   isJtiRevoked,
@@ -11,6 +18,8 @@ import {
   revokeJti,
 } from './tokenStore.js'
 import { provisionClientSchema } from '../db/clientSchema/provision.js'
+import { recordClientActivity } from './clientHistory.service.js'
+import { AUDIT_DOMAIN } from '../audit/index.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -87,6 +96,15 @@ export async function login(email, password, appSurface) {
   if (appSurface === 'home') {
     result.handoffCode = issueImpersonationCode({ userId: publicUser.id })
   }
+  if (publicUser.portal === 'client') {
+    recordClientActivity(publicUser.id, {
+      domain: AUDIT_DOMAIN.USER,
+      action: 'client.sign_in',
+      subjectId: publicUser.id,
+      subjectLabel: publicUser.email,
+      metadata: { performedByLabel: publicUser.displayName || publicUser.email },
+    }).catch(() => {})
+  }
   return result
 }
 
@@ -102,7 +120,7 @@ export async function signUpClient({ email, password, displayName }) {
     err.status = 400
     throw err
   }
-  const roleRow = await findRoleByKey('client')
+  const roleRow = await findRoleByKey('super_admin')
   if (!roleRow) {
     const err = new Error('Client sign-up is not available')
     err.status = 503
@@ -115,14 +133,27 @@ export async function signUpClient({ email, password, displayName }) {
     throw err
   }
   const passwordHash = await bcrypt.hash(password, 12)
-  const user = await createUser({
+  let user = await createUser({
     email: normalizedEmail,
     passwordHash,
     role: 'client',
     displayName: displayName?.trim() || normalizedEmail.split('@')[0],
+    accessRoleKey: 'super_admin',
   })
+  await getPostgresPool().query(`UPDATE users SET tenant_owner_id = id WHERE id = $1`, [user.id])
+  user = { ...user, tenant_owner_id: user.id, access_role_key: 'super_admin' }
   const publicUser = toPublicUser(user)
-  provisionClientSchema(user.id).catch((err) => console.error('[client-schema] provision failed', user.id, err.message))
+  provisionClientSchema(user.id)
+    .then(() =>
+      recordClientActivity(publicUser.id, {
+        domain: AUDIT_DOMAIN.USER,
+        action: 'client.sign_up',
+        subjectId: publicUser.id,
+        subjectLabel: publicUser.email,
+        metadata: { performedByLabel: publicUser.displayName || publicUser.email },
+      }),
+    )
+    .catch((err) => console.error('[client-schema] provision failed', user.id, err.message))
   return {
     user: publicUser,
     handoffCode: issueImpersonationCode({ userId: publicUser.id }),
@@ -158,12 +189,18 @@ export async function registerUser({ email, password, displayName, role }, actor
     throw err
   }
   const passwordHash = await bcrypt.hash(password, 12)
-  const user = await createUser({
+  let user = await createUser({
     email,
     passwordHash,
     role,
     displayName: displayName || email.split('@')[0],
+    accessRoleKey: role === 'client' ? 'super_admin' : undefined,
   })
+  if (role === 'client') {
+    await getPostgresPool().query(`UPDATE users SET tenant_owner_id = id WHERE id = $1`, [user.id])
+    user = { ...user, tenant_owner_id: user.id, access_role_key: 'super_admin' }
+    provisionClientSchema(user.id).catch(() => {})
+  }
   return toPublicUser(user)
 }
 
