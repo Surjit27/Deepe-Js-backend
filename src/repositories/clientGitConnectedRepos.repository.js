@@ -8,6 +8,16 @@ function schema(clientUserId) {
   return clientSchemaName(clientUserId)
 }
 
+export async function findConnectedRepoById(clientUserId, id) {
+  const { rows } = await getPostgresPool().query(
+    `SELECT ${COLS}
+     FROM ${schema(clientUserId)}.git_connected_repos
+     WHERE id = $1`,
+    [id],
+  )
+  return rows[0] ?? null
+}
+
 export async function listConnectedRepos(clientUserId) {
   const { rows } = await getPostgresPool().query(
     `SELECT ${COLS}
