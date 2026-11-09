@@ -5,6 +5,7 @@ import { runMigrations } from './db/migrate.js'
 import { applyPrismaMigrations } from './db/prisma.js'
 import { seedAdminUser, seedClientAccessRoles } from './db/seed.js'
 import { startJobRunner, stopJobRunner } from './jobs/runner.js'
+import { startRepoIndexRunner, stopRepoIndexRunner } from './jobs/repoIndexRunner.js'
 
 async function main() {
   await applyPrismaMigrations()
@@ -14,6 +15,7 @@ async function main() {
   await seedClientAccessRoles()
   console.log('[db] PostgreSQL and MongoDB connected')
   await startJobRunner(env.redisUrl)
+  await startRepoIndexRunner(env.redisUrl)
 
   const app = createApp()
   const server = app.listen(env.port, () => {
@@ -24,6 +26,7 @@ async function main() {
     console.log(`[server] ${signal} — shutting down`)
     server.close(async () => {
       await stopJobRunner()
+      await stopRepoIndexRunner()
       await closeDatabases()
       process.exit(0)
     })

@@ -7,6 +7,7 @@ import { adminHistoryRouter } from './history.routes.js'
 import { clientHistoryRouter } from './clientHistory.routes.js'
 import { clientAccessRouter } from './clientAccess.routes.js'
 import { clientGitRouter } from './clientGit.routes.js'
+import { clientExplorerRouter } from './clientExplorer.routes.js'
 import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 
 export const apiRouter = Router()
@@ -19,6 +20,7 @@ apiRouter.use('/admin', adminHistoryRouter)
 apiRouter.use('/client', clientHistoryRouter)
 apiRouter.use('/client', clientAccessRouter)
 apiRouter.use('/client', clientGitRouter)
+apiRouter.use('/client', clientExplorerRouter)
 
 apiRouter.get(
   '/orders',

@@ -105,3 +105,60 @@ export async function getGitHubRepo(token, owner, repo) {
     updatedAt: r.updated_at,
   }
 }
+
+export async function getGitHubBranchSha(token, owner, repo, branch) {
+  const ref = await githubFetch(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/${encodeURIComponent(`heads/${branch}`)}`,
+    token,
+  )
+  const sha = ref?.object?.sha
+  if (!sha) {
+    const err = new Error('Branch ref not found')
+    err.status = 404
+    throw err
+  }
+  return sha
+}
+
+export async function getGitHubCommitTreeSha(token, owner, repo, commitSha) {
+  const commit = await githubFetch(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits/${encodeURIComponent(commitSha)}`,
+    token,
+  )
+  const treeSha = commit?.tree?.sha
+  if (!treeSha) {
+    const err = new Error('Commit tree not found')
+    err.status = 404
+    throw err
+  }
+  return treeSha
+}
+
+/** @returns {{ sha: string, truncated: boolean, entries: { path: string, type: string, size?: number }[] }} */
+export async function getGitHubRecursiveTree(token, owner, repo, treeSha, { maxEntries = 800 } = {}) {
+  const tree = await githubFetch(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(treeSha)}`,
+    token,
+    { query: { recursive: '1' } },
+  )
+  const all = Array.isArray(tree.tree) ? tree.tree : []
+  const truncated = all.length > maxEntries || Boolean(tree.truncated)
+  const entries = all
+    .filter((e) => e.type === 'blob' || e.type === 'tree')
+    .slice(0, maxEntries)
+    .map((e) => ({ path: e.path, type: e.type, size: e.size }))
+  return { sha: tree.sha, truncated, entries }
+}
+
+export async function getGitHubFileText(token, owner, repo, path, ref) {
+  const data = await githubFetch(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')}`,
+    token,
+    { query: ref ? { ref } : {} },
+  )
+  if (!data || data.encoding !== 'base64' || !data.content) return ''
+  return Buffer.from(data.content, 'base64').toString('utf8')
+}
