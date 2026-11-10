@@ -213,7 +213,7 @@ const ROLE_KEY_RE = /^[a-z][a-z0-9_]{1,39}$/
 
 export async function listRoleCatalog(actorRole) {
   if (actorRole !== 'admin') {
-    const err = new Error('Forbidden')
+    const err = new Error('Only admins can list roles')
     err.status = 403
     throw err
   }
@@ -295,7 +295,7 @@ export async function exchangeImpersonationCode(code) {
 
 export async function listAccounts(actorRole, { role } = {}) {
   if (actorRole !== 'admin') {
-    const err = new Error('Forbidden')
+    const err = new Error('Only admins can list accounts')
     err.status = 403
     throw err
   }
