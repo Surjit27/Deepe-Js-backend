@@ -18,5 +18,9 @@ healthRouter.get('/health', async (_req, res) => {
 healthRouter.get('/ready', async (_req, res) => {
   const databases = await databasesHealth()
   const ready = databases.postgres.ok && databases.mongo.ok
-  res.sendStatus(ready ? 200 : 503)
+  res.status(ready ? 200 : 503).json({
+    ready,
+    timestamp: new Date().toISOString(),
+    databases,
+  })
 })
