@@ -1,5 +1,10 @@
 import { migrateClientSchemaIfNeeded } from '../db/clientSchema/provision.js'
-import { insertClientActivityEvent, listClientActivityByDomain } from '../repositories/clientHistory.repository.js'
+import {
+  countClientActivityByDomain,
+  insertClientActivityEvent,
+  listClientActivityByDomain,
+} from '../repositories/clientHistory.repository.js'
+import { parseHistoryListQuery } from '../utils/historyQuery.js'
 
 function toPublic(row) {
   const metadata = row.metadata ?? {}
@@ -24,11 +29,24 @@ export async function ensureClientSchemaReady(clientUserId) {
 
 export async function listClientHistory(clientUserId, domain, query = {}) {
   await ensureClientSchemaReady(clientUserId)
-  const rows = await listClientActivityByDomain(clientUserId, domain, {
-    limit: query.limit,
-    offset: query.offset,
-  })
-  return { events: rows.map(toPublic) }
+  const parsed = parseHistoryListQuery(query, { mode: 'client' })
+  const [rows, total] = await Promise.all([
+    listClientActivityByDomain(clientUserId, domain, {
+      limit: parsed.limit,
+      offset: parsed.offset,
+      sortSql: parsed.sortSql,
+      order: parsed.order,
+    }),
+    countClientActivityByDomain(clientUserId, domain),
+  ])
+  return {
+    events: rows.map(toPublic),
+    total,
+    limit: parsed.limit,
+    offset: parsed.offset,
+    sort: parsed.sortKey,
+    order: parsed.order === 'ASC' ? 'asc' : 'desc',
+  }
 }
 
 export async function recordClientActivity(clientUserId, event) {

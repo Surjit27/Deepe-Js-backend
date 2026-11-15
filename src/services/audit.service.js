@@ -1,4 +1,5 @@
-import { listAuditEventsByDomain } from '../repositories/audit.repository.js'
+import { countAuditEventsByDomain, listAuditEventsByDomain } from '../repositories/audit.repository.js'
+import { parseHistoryListQuery } from '../utils/historyQuery.js'
 
 function toPublic(row) {
   const metadata = row.metadata ?? {}
@@ -18,9 +19,22 @@ function toPublic(row) {
 }
 
 export async function listHistoryByDomain(domain, query = {}) {
-  const rows = await listAuditEventsByDomain(domain, {
-    limit: query.limit,
-    offset: query.offset,
-  })
-  return { events: rows.map(toPublic) }
+  const parsed = parseHistoryListQuery(query, { mode: 'audit' })
+  const [rows, total] = await Promise.all([
+    listAuditEventsByDomain(domain, {
+      limit: parsed.limit,
+      offset: parsed.offset,
+      sortSql: parsed.sortSql,
+      order: parsed.order,
+    }),
+    countAuditEventsByDomain(domain),
+  ])
+  return {
+    events: rows.map(toPublic),
+    total,
+    limit: parsed.limit,
+    offset: parsed.offset,
+    sort: parsed.sortKey,
+    order: parsed.order === 'ASC' ? 'asc' : 'desc',
+  }
 }

@@ -10,9 +10,7 @@ const adminOnly = [authenticate, requireRoleMatchesPortal, requireRole('admin'),
 function historyHandler(domain) {
   return async (req, res, next) => {
     try {
-      const limit = typeof req.query.limit === 'string' ? req.query.limit : undefined
-      const offset = typeof req.query.offset === 'string' ? req.query.offset : undefined
-      res.json(await listHistoryByDomain(domain, { limit, offset }))
+      res.json(await listHistoryByDomain(domain, req.query))
     } catch (err) {
       next(err)
     }
