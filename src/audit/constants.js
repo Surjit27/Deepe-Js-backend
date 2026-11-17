@@ -13,6 +13,8 @@ export const AUDIT_ACTION = {
   /** One row when the client tab successfully opens an impersonation session. */
   IMPERSONATION: 'impersonation',
   EMAIL_SETTINGS_UPDATED: 'settings.updated',
+  EMAIL_PROVIDER_CREATED: 'provider.created',
+  EMAIL_PREVIEW_SAVED: 'preview.saved',
   EMAIL_TEST_SENT: 'test.sent',
   EMAIL_TEST_FAILED: 'test.failed',
   JOB_TRIGGER_CREATED: 'trigger.created',

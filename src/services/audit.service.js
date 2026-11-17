@@ -14,6 +14,9 @@ function toPublic(row) {
     performedByLabel: metadata.performedByLabel ?? '',
     request: metadata.request ?? null,
     response: metadata.response ?? null,
+    previewId: metadata.previewId ?? null,
+    templateId: metadata.templateId ?? null,
+    emailSubject: metadata.subject ?? null,
     metadata,
   }
 }

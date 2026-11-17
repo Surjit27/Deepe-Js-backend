@@ -42,6 +42,8 @@ export const env = {
     adminName: process.env.ADMIN_NAME ?? 'Platform Admin',
   },
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? '',
+  pythonBackendUrl: (process.env.PYTHON_BACKEND_URL ?? 'http://127.0.0.1:4100').replace(/\/$/, ''),
+  internalApiKey: process.env.INTERNAL_API_KEY ?? '',
   /** GitHub: env PAT fallback + OAuth app (private repos, future PRs). */
   github: {
     accountEmail: (process.env.GITHUB_ACCOUNT_EMAIL ?? '').trim().toLowerCase(),
