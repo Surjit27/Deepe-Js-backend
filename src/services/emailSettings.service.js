@@ -18,14 +18,25 @@ function resolvedApiKey(row) {
   return { apiKey: '', source: 'none' }
 }
 
+function maskSendGridKey(apiKey) {
+  if (!apiKey || !apiKey.startsWith('SG.')) return null
+  const tail = apiKey.slice(-4)
+  return `SG.${'•'.repeat(12)}${tail}`
+}
+
 function toPublic(row) {
-  const { source } = resolvedApiKey(row)
+  const { apiKey, source } = resolvedApiKey(row)
+  const savedInDb = Boolean(row?.api_key_cipher)
   return {
     enabled: row.enabled,
     fromEmail: row.from_email,
     fromName: row.from_name,
     apiKeySet: source !== 'none',
     apiKeySource: source,
+    apiKeyMasked: apiKey ? maskSendGridKey(apiKey) : null,
+    apiKeySavedInDatabase: savedInDb,
+    storageTable: 'email_settings',
+    storageColumn: savedInDb ? 'api_key_cipher' : null,
     updatedAt: row.updated_at,
   }
 }
@@ -75,15 +86,30 @@ export async function sendTestEmail(to) {
 
   sgMail.setApiKey(apiKey)
   try {
-    await sgMail.send({
+    const [response] = await sgMail.send({
       to: recipient,
       from: { email: row.from_email, name: row.from_name || undefined },
+      replyTo: row.from_email,
       subject: 'Aazhi test email',
       text: 'This is a test message from Aazhi. Email is configured with SendGrid.',
+      html: '<p>This is a test message from <strong>Aazhi</strong>. Email is configured with SendGrid.</p>',
+      trackingSettings: { clickTracking: { enable: false }, openTracking: { enable: false } },
     })
+    const messageId = response?.headers?.['x-message-id'] || null
+    return {
+      ok: true,
+      to: recipient,
+      from: row.from_email,
+      messageId,
+      deliveryNote:
+        'SendGrid accepted the message. Delivery can take 1–5 minutes. Check spam/junk and SendGrid → Activity if nothing arrives.',
+    }
   } catch (err) {
     const detail = err?.response?.body?.errors?.[0]?.message || err.message || 'SendGrid rejected the message'
-    throw httpError(400, detail)
+    const hint =
+      /sender identity|verified sender/i.test(detail)
+        ? `${detail} Verify this From address under SendGrid → Settings → Sender Authentication, then save the same address in Aazhi Settings.`
+        : detail
+    throw httpError(400, hint)
   }
-  return { ok: true, to: recipient }
 }
