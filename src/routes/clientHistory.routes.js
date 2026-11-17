@@ -10,9 +10,7 @@ const clientOnly = [authenticate, requireRoleMatchesPortal, requireRole('client'
 function historyHandler(domain) {
   return async (req, res, next) => {
     try {
-      const limit = typeof req.query.limit === 'string' ? req.query.limit : undefined
-      const offset = typeof req.query.offset === 'string' ? req.query.offset : undefined
-      res.json(await listClientHistory(req.auth.userId, domain, { limit, offset }))
+      res.json(await listClientHistory(req.auth.userId, domain, req.query))
     } catch (err) {
       next(err)
     }

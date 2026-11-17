@@ -33,17 +33,32 @@ export async function insertAuditEvent({
   return rows[0]
 }
 
-export async function listAuditEventsByDomain(domain, { limit = 100, offset = 0 } = {}) {
+export async function countAuditEventsByDomain(domain) {
+  if (!DOMAINS.has(domain)) {
+    throw new Error(`Invalid audit domain: ${domain}`)
+  }
+  const { rows } = await getPostgresPool().query(
+    `SELECT COUNT(*)::int AS count FROM audit_events WHERE domain = $1`,
+    [domain],
+  )
+  return rows[0]?.count ?? 0
+}
+
+export async function listAuditEventsByDomain(
+  domain,
+  { limit = 100, offset = 0, sortSql = 'created_at', order = 'DESC' } = {},
+) {
   if (!DOMAINS.has(domain)) {
     throw new Error(`Invalid audit domain: ${domain}`)
   }
   const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 200)
   const safeOffset = Math.max(Number(offset) || 0, 0)
+  const safeOrder = order === 'ASC' ? 'ASC' : 'DESC'
   const { rows } = await getPostgresPool().query(
     `SELECT id, domain, action, actor_user_id, subject_id, subject_label, metadata, created_at
      FROM audit_events
      WHERE domain = $1
-     ORDER BY created_at DESC
+     ORDER BY ${sortSql} ${safeOrder} NULLS LAST, created_at DESC
      LIMIT $2 OFFSET $3`,
     [domain, safeLimit, safeOffset],
   )
