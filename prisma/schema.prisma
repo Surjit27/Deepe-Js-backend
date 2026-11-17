@@ -38,6 +38,26 @@ model Role {
   @@map("roles")
 }
 
+model EmailPreview {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId         String   @map("template_id") @db.VarChar(64)
+  kind               String   @default("preview") @db.VarChar(32)
+  subject            String   @default("") @db.VarChar(255)
+  htmlBody           String   @map("html_body")
+  textBody           String   @default("") @map("text_body")
+  variables          Json     @default("{}")
+  fromEmail          String   @default("") @map("from_email") @db.VarChar(255)
+  fromName           String   @default("") @map("from_name") @db.VarChar(255)
+  recipientEmail     String   @default("") @map("recipient_email") @db.VarChar(255)
+  sendgridMessageId  String   @default("") @map("sendgrid_message_id") @db.VarChar(255)
+  actorUserId        String?  @map("actor_user_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)], map: "idx_email_previews_created")
+  @@index([actorUserId], map: "idx_email_previews_actor")
+  @@map("email_previews")
+}
+
 model EmailSettings {
   id             Boolean  @id @default(true)
   enabled        Boolean  @default(false)
@@ -52,6 +72,23 @@ model EmailSettings {
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("email_settings")
+}
+
+model EmailProvider {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider     String   @db.VarChar(32)
+  name         String   @db.VarChar(120)
+  status       String   @default("inactive") @db.VarChar(20)
+  enabled      Boolean  @default(false)
+  apiKeyCipher String   @default("") @map("api_key_cipher")
+  fromEmail    String   @default("") @map("from_email") @db.VarChar(255)
+  fromName     String   @default("") @map("from_name") @db.VarChar(255)
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([provider], map: "idx_email_providers_provider")
+  @@map("email_providers")
 }
 
 model JobTrigger {

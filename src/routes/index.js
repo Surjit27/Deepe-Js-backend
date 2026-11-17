@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { healthRouter } from './health.routes.js'
 import { authRouter } from './auth.routes.js'
 import { emailSettingsRouter } from './emailSettings.routes.js'
+import { emailProvidersRouter } from './emailProviders.routes.js'
+import { apiTokenProvidersRouter } from './apiTokenProviders.routes.js'
 import { jobTriggersRouter } from './jobTriggers.routes.js'
 import { adminHistoryRouter } from './history.routes.js'
 import { clientHistoryRouter } from './clientHistory.routes.js'
@@ -15,6 +17,8 @@ export const apiRouter = Router()
 apiRouter.use(healthRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.use('/settings', emailSettingsRouter)
+apiRouter.use('/settings', emailProvidersRouter)
+apiRouter.use('/settings', apiTokenProvidersRouter)
 apiRouter.use('/settings', jobTriggersRouter)
 apiRouter.use('/admin', adminHistoryRouter)
 apiRouter.use('/client', clientHistoryRouter)
