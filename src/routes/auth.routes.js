@@ -4,6 +4,7 @@ import { rateLimit } from '../middleware/rateLimit.js'
 import { AUDIT_ACTION, AUDIT_DOMAIN, auditHttpRequest, auditHttpResponse, recordAuditEvent } from '../audit/index.js'
 import { findUserById } from '../repositories/users.repository.js'
 import { provisionClientSchema } from '../db/clientSchema/provision.js'
+import { personalSettingsRouter } from './personalSettings.routes.js'
 import {
   exchangeImpersonationCode,
   createRoleCatalog,
@@ -17,6 +18,8 @@ import {
 } from '../services/auth.service.js'
 
 export const authRouter = Router()
+
+authRouter.use(personalSettingsRouter)
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 12, name: 'login' })
 const signupLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 8, name: 'signup' })
