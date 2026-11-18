@@ -5,6 +5,7 @@ import { AUDIT_ACTION, AUDIT_DOMAIN, auditHttpRequest, auditHttpResponse, record
 import { findUserById } from '../repositories/users.repository.js'
 import { provisionClientSchema } from '../db/clientSchema/provision.js'
 import { personalSettingsRouter } from './personalSettings.routes.js'
+import { accountSecurityRouter } from './accountSecurity.routes.js'
 import {
   exchangeImpersonationCode,
   createRoleCatalog,
@@ -20,6 +21,7 @@ import {
 export const authRouter = Router()
 
 authRouter.use(personalSettingsRouter)
+authRouter.use(accountSecurityRouter)
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 12, name: 'login' })
 const signupLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 8, name: 'signup' })
