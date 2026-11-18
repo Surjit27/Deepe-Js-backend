@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { createRole, findRoleByKey, listRoles, toPublicRole } from '../repositories/roles.repository.js'
+import { findUserCredentialsByEmail } from '../repositories/accountSecurity.repository.js'
+import { verifyTwoFactorForUser } from './accountSecurity.service.js'
 import {
   createUser,
   findUserByEmail,
@@ -19,9 +21,95 @@ import {
 } from './tokenStore.js'
 import { provisionClientSchema } from '../db/clientSchema/provision.js'
 import { recordClientActivity } from './clientHistory.service.js'
-import { AUDIT_DOMAIN } from '../audit/index.js'
+import { AUDIT_ACTION, AUDIT_DOMAIN, recordAuditEvent } from '../audit/index.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function signTwoFactorPendingToken(user) {
+  const payload = {
+    sub: user.id,
+    purpose: '2fa_pending',
+    portal: user.portal || (user.role === 'admin' ? 'admin' : 'client'),
+    email: user.email,
+    jti: randomUUID(),
+  }
+  return jwt.sign(payload, env.auth.jwtSecret, { expiresIn: '5m' })
+}
+
+function verifyAndConsumeTwoFactorPendingToken(token) {
+  const payload = jwt.verify(token, env.auth.jwtSecret)
+  if (payload.purpose !== '2fa_pending') {
+    const err = new Error('Invalid two-factor session')
+    err.status = 401
+    throw err
+  }
+  if (isJtiRevoked(payload.jti)) {
+    const err = new Error('Two-factor session expired')
+    err.status = 401
+    throw err
+  }
+  revokeJti(payload.jti, payload.exp)
+  return payload
+}
+
+function readAppSurfaceFromRequest(req) {
+  const raw = String(req.headers['x-app-surface'] ?? req.headers['X-App-Surface'] ?? 'client').toLowerCase()
+  if (raw === 'admin') return 'admin'
+  if (raw === 'home') return 'home'
+  return 'client'
+}
+
+export async function completeTwoFactorLogin(pendingToken, code, req) {
+  const pending = verifyAndConsumeTwoFactorPendingToken(pendingToken)
+  try {
+    await verifyTwoFactorForUser(pending.sub, code)
+  } catch (err) {
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.LOGIN_TWO_FACTOR_FAILED,
+      subjectId: pending.sub,
+      subjectLabel: pending.email ?? '',
+    })
+    throw err
+  }
+  const user = await findUserById(pending.sub)
+  if (!user) {
+    const err = new Error('User not found')
+    err.status = 404
+    throw err
+  }
+  const publicUser = toPublicUser(user)
+  const appSurface = readAppSurfaceFromRequest(req)
+  const portalForLogin = loginPortalForSurface(appSurface)
+  if (publicUser.portal !== portalForLogin) {
+    const err = new Error(
+      publicUser.portal === 'admin'
+        ? 'Admin accounts cannot sign in here. Use the admin console.'
+        : 'This account must sign in at client.localhost, not admin.localhost',
+    )
+    err.status = 403
+    throw err
+  }
+  return issueLoginResult(publicUser, appSurface)
+}
+
+function issueLoginResult(publicUser, appSurface) {
+  const token = signAccessToken(publicUser)
+  const result = { token, user: publicUser }
+  if (appSurface === 'home') {
+    result.handoffCode = issueImpersonationCode({ userId: publicUser.id })
+  }
+  if (publicUser.portal === 'client') {
+    recordClientActivity(publicUser.id, {
+      domain: AUDIT_DOMAIN.USER,
+      action: 'client.sign_in',
+      subjectId: publicUser.id,
+      subjectLabel: publicUser.email,
+      metadata: { performedByLabel: publicUser.displayName || publicUser.email },
+    }).catch(() => {})
+  }
+  return result
+}
 
 export function signAccessToken(user, { expiresIn, impersonatedBy } = {}) {
   const payload = {
@@ -68,7 +156,7 @@ export async function login(email, password, appSurface) {
     err.status = 401
     throw err
   }
-  const user = await findUserByEmail(normalizedEmail)
+  const user = await findUserCredentialsByEmail(normalizedEmail)
   if (!user) {
     const err = new Error('Invalid email or password')
     err.status = 401
@@ -91,21 +179,15 @@ export async function login(email, password, appSurface) {
     err.status = 403
     throw err
   }
-  const token = signAccessToken(publicUser)
-  const result = { token, user: publicUser }
-  if (appSurface === 'home') {
-    result.handoffCode = issueImpersonationCode({ userId: publicUser.id })
+  if (user.two_factor_enabled) {
+    const pendingToken = signTwoFactorPendingToken(publicUser)
+    return {
+      twoFactorRequired: true,
+      pendingToken,
+      user: { email: publicUser.email, displayName: publicUser.displayName },
+    }
   }
-  if (publicUser.portal === 'client') {
-    recordClientActivity(publicUser.id, {
-      domain: AUDIT_DOMAIN.USER,
-      action: 'client.sign_in',
-      subjectId: publicUser.id,
-      subjectLabel: publicUser.email,
-      metadata: { performedByLabel: publicUser.displayName || publicUser.email },
-    }).catch(() => {})
-  }
-  return result
+  return issueLoginResult(publicUser, appSurface)
 }
 
 export async function signUpClient({ email, password, displayName }) {
