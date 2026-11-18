@@ -20,7 +20,9 @@ model User {
   accessRoleKey  String   @default("super_admin") @map("access_role_key") @db.VarChar(40)
   tenantOwnerId  String?  @map("tenant_owner_id") @db.Uuid
   displayName       String   @default("") @map("display_name") @db.VarChar(255)
-  personalSettings  Json     @default("{}") @map("personal_settings")
+  personalSettings    Json     @default("{}") @map("personal_settings")
+  twoFactorEnabled    Boolean  @default(false) @map("two_factor_enabled")
+  totpSecretCipher    String   @default("") @map("totp_secret_cipher")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
