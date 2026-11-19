@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 import { inviteTenantUser, listClientPortalRoles, listTenantUsers } from '../services/clientAccess.service.js'
+import { clientPatchAccessRolePermissions, getPermissionCatalog } from '../services/rolePermissions.service.js'
 
 export const clientAccessRouter = Router()
 
@@ -9,6 +10,22 @@ const clientOnly = [authenticate, requireRoleMatchesPortal, requireRole('client'
 clientAccessRouter.get('/access/roles', ...clientOnly, async (req, res, next) => {
   try {
     res.json(await listClientPortalRoles())
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientAccessRouter.get('/access/roles/permissions/catalog', ...clientOnly, (req, res, next) => {
+  try {
+    res.json(getPermissionCatalog('client'))
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientAccessRouter.patch('/access/roles/:key/permissions', ...clientOnly, async (req, res, next) => {
+  try {
+    res.json(await clientPatchAccessRolePermissions(req.auth.userId, req.params.key, req.body?.permissions))
   } catch (err) {
     next(err)
   }

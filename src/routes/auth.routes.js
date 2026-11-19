@@ -4,6 +4,9 @@ import { rateLimit } from '../middleware/rateLimit.js'
 import { AUDIT_ACTION, AUDIT_DOMAIN, auditHttpRequest, auditHttpResponse, recordAuditEvent } from '../audit/index.js'
 import { findUserById } from '../repositories/users.repository.js'
 import { provisionClientSchema } from '../db/clientSchema/provision.js'
+import { personalSettingsRouter } from './personalSettings.routes.js'
+import { accountSecurityRouter } from './accountSecurity.routes.js'
+import { twoFactorRouter } from './twoFactor.routes.js'
 import {
   exchangeImpersonationCode,
   createRoleCatalog,
@@ -15,8 +18,13 @@ import {
   revokeAccessToken,
   startClientImpersonation,
 } from '../services/auth.service.js'
+import { adminPatchRolePermissions, getPermissionCatalog } from '../services/rolePermissions.service.js'
 
 export const authRouter = Router()
+
+authRouter.use(personalSettingsRouter)
+authRouter.use(accountSecurityRouter)
+authRouter.use(twoFactorRouter)
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 12, name: 'login' })
 const signupLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 8, name: 'signup' })
@@ -184,6 +192,32 @@ authRouter.post('/roles', authenticate, requireRoleMatchesPortal, requireRole('a
       metadata: { portal: role.portal, label: role.label },
     })
     res.status(201).json({ role })
+  } catch (err) {
+    next(err)
+  }
+})
+
+authRouter.get('/roles/permissions/catalog', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, (req, res, next) => {
+  try {
+    const portal = req.query.portal === 'client' ? 'client' : 'admin'
+    res.json(getPermissionCatalog(portal))
+  } catch (err) {
+    next(err)
+  }
+})
+
+authRouter.patch('/roles/:key/permissions', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, async (req, res, next) => {
+  try {
+    const result = await adminPatchRolePermissions(req.params.key, req.body?.permissions, req.auth.role)
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.ROLE_PERMISSIONS_UPDATED,
+      actorUserId: req.auth.userId,
+      subjectId: result.role.id,
+      subjectLabel: result.role.key,
+      metadata: { permissions: result.role.permissions },
+    })
+    res.json(result)
   } catch (err) {
     next(err)
   }
