@@ -8,6 +8,7 @@ import { clientHistoryRouter } from './clientHistory.routes.js'
 import { clientAccessRouter } from './clientAccess.routes.js'
 import { clientGitRouter } from './clientGit.routes.js'
 import { clientExplorerRouter } from './clientExplorer.routes.js'
+import { adminFeatureFlagsRouter, clientFeatureFlagsRouter } from './featureFlags.routes.js'
 import { authenticate, requireAdminPortal, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
 
 export const apiRouter = Router()
@@ -17,6 +18,8 @@ apiRouter.use('/auth', authRouter)
 apiRouter.use('/settings', emailSettingsRouter)
 apiRouter.use('/settings', jobTriggersRouter)
 apiRouter.use('/admin', adminHistoryRouter)
+apiRouter.use('/admin', adminFeatureFlagsRouter)
+apiRouter.use('/client', clientFeatureFlagsRouter)
 apiRouter.use('/client', clientHistoryRouter)
 apiRouter.use('/client', clientAccessRouter)
 apiRouter.use('/client', clientGitRouter)
