@@ -10,6 +10,7 @@ export const AUDIT_ACTION = {
   LOGOUT: 'logout',
   USER_CREATED: 'user.created',
   ROLE_CREATED: 'role.created',
+  ROLE_PERMISSIONS_UPDATED: 'role.permissions_updated',
   /** One row when the client tab successfully opens an impersonation session. */
   IMPERSONATION: 'impersonation',
   PERSONAL_SETTINGS_UPDATED: 'personal_settings.updated',
