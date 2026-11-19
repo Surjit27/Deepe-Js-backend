@@ -18,6 +18,7 @@ import {
   revokeAccessToken,
   startClientImpersonation,
 } from '../services/auth.service.js'
+import { adminPatchRolePermissions, getPermissionCatalog } from '../services/rolePermissions.service.js'
 
 export const authRouter = Router()
 
@@ -191,6 +192,32 @@ authRouter.post('/roles', authenticate, requireRoleMatchesPortal, requireRole('a
       metadata: { portal: role.portal, label: role.label },
     })
     res.status(201).json({ role })
+  } catch (err) {
+    next(err)
+  }
+})
+
+authRouter.get('/roles/permissions/catalog', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, (req, res, next) => {
+  try {
+    const portal = req.query.portal === 'client' ? 'client' : 'admin'
+    res.json(getPermissionCatalog(portal))
+  } catch (err) {
+    next(err)
+  }
+})
+
+authRouter.patch('/roles/:key/permissions', authenticate, requireRoleMatchesPortal, requireRole('admin'), requireAdminPortal, async (req, res, next) => {
+  try {
+    const result = await adminPatchRolePermissions(req.params.key, req.body?.permissions, req.auth.role)
+    recordAuditEvent({
+      domain: AUDIT_DOMAIN.USER,
+      action: AUDIT_ACTION.ROLE_PERMISSIONS_UPDATED,
+      actorUserId: req.auth.userId,
+      subjectId: result.role.id,
+      subjectLabel: result.role.key,
+      metadata: { permissions: result.role.permissions },
+    })
+    res.json(result)
   } catch (err) {
     next(err)
   }
