@@ -3,7 +3,9 @@ import { decryptSecret } from '../lib/secretBox.js'
 import { findConnectedRepoById } from '../repositories/clientGitConnectedRepos.repository.js'
 import { findGitCredentialById, findDefaultGitCredential } from '../repositories/clientGitCredentials.repository.js'
 import {
+  findLatestRepoIndexJob,
   findRepoCodeGraph,
+  findRepoIndexJobById,
   insertRepoIndexJob,
   listRepoCodeGraphs,
   markRepoIndexJob,
@@ -13,6 +15,7 @@ import { findUserById } from '../repositories/users.repository.js'
 import { recordClientActivity } from './clientHistory.service.js'
 import { env } from '../config/env.js'
 import {
+  formatGithubApiError,
   getGitHubBranchSha,
   getGitHubCommitTreeSha,
   getGitHubRecursiveTree,
@@ -24,6 +27,21 @@ import { enqueueRepoIndexJob, repoIndexQueueEnabled } from '../jobs/repoIndexRun
 function httpError(status, message) {
   const err = new Error(message)
   err.status = status
+  return err
+}
+
+function humanizeIndexError(err) {
+  const raw = String(err?.message ?? err)
+  if (/bad credentials|rejected this token/i.test(raw)) {
+    return httpError(
+      403,
+      formatGithubApiError('Bad credentials', 401) +
+        ' Re-link the connected repo to a working GitHub account under Client → GitHub.',
+    )
+  }
+  if (err?.status === 403 && /rate limit/i.test(raw)) {
+    return httpError(429, 'GitHub API rate limit — try again in a few minutes.')
+  }
   return err
 }
 
@@ -120,10 +138,11 @@ export async function runRepoIndex(schemaUserId, connectedRepoId, jobId) {
       truncated,
     }
   } catch (err) {
+    const friendly = humanizeIndexError(err)
     if (jobId) {
       await markRepoIndexJob(schemaUserId, jobId, {
         status: 'failed',
-        error: String(err.message ?? err).slice(0, 2000),
+        error: String(friendly.message ?? friendly).slice(0, 2000),
         finishedAt: new Date(),
       })
     }
@@ -132,9 +151,9 @@ export async function runRepoIndex(schemaUserId, connectedRepoId, jobId) {
       action: 'repo_index_failed',
       subjectId: connectedRepoId,
       subjectLabel: repoRow.full_name,
-      metadata: { error: String(err.message ?? err).slice(0, 500) },
+      metadata: { error: String(friendly.message ?? friendly).slice(0, 500) },
     }).catch(() => {})
-    throw err
+    throw friendly
   }
 }
 
@@ -153,6 +172,31 @@ export async function queueRepoIndex(userId, connectedRepoId) {
 
   const result = await runRepoIndex(schemaUserId, connectedRepoId, jobRow.id)
   return { jobId: jobRow.id, status: 'success', async: false, result }
+}
+
+export async function getRepoIndexStatus(userId, connectedRepoId, { jobId } = {}) {
+  const { schemaUserId } = await assertClientActor(userId)
+  await migrateClientSchemaIfNeeded(schemaUserId)
+  const repoRow = await findConnectedRepoById(schemaUserId, connectedRepoId)
+  if (!repoRow) throw httpError(404, 'Connected repo not found')
+
+  const job = jobId
+    ? await findRepoIndexJobById(schemaUserId, jobId)
+    : await findLatestRepoIndexJob(schemaUserId, connectedRepoId)
+  if (!job) throw httpError(404, 'No index job found')
+  if (String(job.connected_repo_id) !== String(connectedRepoId)) {
+    throw httpError(404, 'Index job not found for this repo')
+  }
+
+  return {
+    jobId: job.id,
+    connectedRepoId: job.connected_repo_id,
+    status: job.status,
+    error: job.error ?? '',
+    createdAt: job.created_at,
+    startedAt: job.started_at,
+    finishedAt: job.finished_at,
+  }
 }
 
 export async function getRepoGraph(userId, connectedRepoId) {

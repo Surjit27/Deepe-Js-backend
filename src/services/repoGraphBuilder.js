@@ -15,10 +15,14 @@ function parseSymbols(source) {
   const symbols = []
   const uses = new Set()
   const importRe = /import\s+(?:[^'"]+\s+from\s+)?['"]([^'"]+)['"]/g
+  const exportFromRe = /export\s+(?:\*|{[^}]*})\s+from\s+['"]([^'"]+)['"]/g
   const reqRe = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+  const dynamicImportRe = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g
   let m
   while ((m = importRe.exec(source))) uses.add(m[1])
+  while ((m = exportFromRe.exec(source))) uses.add(m[1])
   while ((m = reqRe.exec(source))) uses.add(m[1])
+  while ((m = dynamicImportRe.exec(source))) uses.add(m[1])
 
   const fnRe = /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g
   while ((m = fnRe.exec(source))) {
@@ -106,6 +110,8 @@ export function buildGraphFromTree(repoRow, branch, commitSha, entries) {
       name: parts.at(-1),
       path: blob.path,
       loc: blob.size || 0,
+      uses: [],
+      usedBy: [],
       children: [],
     }
     parent.children.push(fileNode)
@@ -125,7 +131,7 @@ export async function enrichGraphWithSymbols({ fileNodes, filePaths, meta }, tok
   const idToPath = new Map(fileNodes.map((f) => [f.id, f.path]))
   const fileDeps = new Map()
 
-  const targets = fileNodes.filter((f) => isSourcePath(f.path)).slice(0, 48)
+  const targets = fileNodes.filter((f) => isSourcePath(f.path)).slice(0, 200)
   let symbolCount = 0
 
   for (const file of targets) {

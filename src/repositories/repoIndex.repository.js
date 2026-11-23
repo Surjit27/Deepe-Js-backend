@@ -15,6 +15,28 @@ export async function insertRepoIndexJob(clientUserId, connectedRepoId) {
   return rows[0]
 }
 
+export async function findRepoIndexJobById(clientUserId, jobId) {
+  const { rows } = await getPostgresPool().query(
+    `SELECT id, connected_repo_id, status, error, created_at, started_at, finished_at
+     FROM ${schema(clientUserId)}.repo_index_jobs
+     WHERE id = $1`,
+    [jobId],
+  )
+  return rows[0] ?? null
+}
+
+export async function findLatestRepoIndexJob(clientUserId, connectedRepoId) {
+  const { rows } = await getPostgresPool().query(
+    `SELECT id, connected_repo_id, status, error, created_at, started_at, finished_at
+     FROM ${schema(clientUserId)}.repo_index_jobs
+     WHERE connected_repo_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [connectedRepoId],
+  )
+  return rows[0] ?? null
+}
+
 export async function markRepoIndexJob(clientUserId, jobId, patch) {
   const { rows } = await getPostgresPool().query(
     `UPDATE ${schema(clientUserId)}.repo_index_jobs
