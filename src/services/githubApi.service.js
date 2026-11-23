@@ -1,5 +1,16 @@
 const GITHUB_API = 'https://api.github.com'
 
+export function formatGithubApiError(message = '', githubStatus = 0) {
+  const msg = String(message || '').trim()
+  if (githubStatus === 401 && /bad credentials/i.test(msg)) {
+    return 'GitHub rejected this token (Bad credentials). It may be expired or revoked — delete the account here and add a new classic PAT with repo scope.'
+  }
+  if (githubStatus === 403 && /resource not accessible/i.test(msg)) {
+    return 'GitHub token lacks permission for this resource. Add repo scope or pick a token with access to the repository.'
+  }
+  return msg || `GitHub API error (${githubStatus || 'unknown'})`
+}
+
 function headers(token) {
   return {
     Accept: 'application/vnd.github+json',
@@ -25,7 +36,7 @@ async function githubFetch(path, token, { method = 'GET', query } = {}) {
     body = { message: text }
   }
   if (!res.ok) {
-    const err = new Error(body?.message ?? `GitHub API ${res.status}`)
+    const err = new Error(formatGithubApiError(body?.message, res.status))
     err.status = res.status === 401 || res.status === 403 ? 403 : 502
     err.githubStatus = res.status
     throw err

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authenticate, requireRole, requireRoleMatchesPortal } from '../middleware/auth.middleware.js'
-import { getRepoGraph, listRepoGraphs, queueRepoIndex } from '../services/repoIndex.service.js'
+import { getRepoGraph, getRepoIndexStatus, listRepoGraphs, queueRepoIndex } from '../services/repoIndex.service.js'
 
 export const clientExplorerRouter = Router()
 
@@ -10,6 +10,15 @@ clientExplorerRouter.post('/explorer/repos/:connectedRepoId/index', ...clientOnl
   try {
     const payload = await queueRepoIndex(req.auth.userId, req.params.connectedRepoId)
     res.status(payload.async ? 202 : 200).json(payload)
+  } catch (err) {
+    next(err)
+  }
+})
+
+clientExplorerRouter.get('/explorer/repos/:connectedRepoId/index/status', ...clientOnly, async (req, res, next) => {
+  try {
+    const jobId = req.query.jobId ? Number(req.query.jobId) : undefined
+    res.json(await getRepoIndexStatus(req.auth.userId, req.params.connectedRepoId, { jobId }))
   } catch (err) {
     next(err)
   }

@@ -340,7 +340,16 @@ export async function listCredentialRepositories(userId, credentialId, query = {
   const row = await findGitCredentialById(schemaUserId, credentialId)
   if (!row) throw httpError(404, 'Git credential not found')
   const resolved = await resolveCredential(schemaUserId, { credentialId })
-  const profile = await verifyGitHubToken(resolved.token)
+  let profile
+  try {
+    profile = await verifyGitHubToken(resolved.token)
+  } catch (err) {
+    const who = row.account_email || row.label || credentialId
+    throw httpError(
+      err.status ?? 403,
+      `Could not verify GitHub account ${who}: ${err.message ?? 'token check failed'}`,
+    )
+  }
 
   const perPage = 100
   let page = 1
