@@ -1,6 +1,8 @@
-# Aazhi Backend
+# Deepe · Node backend (Aazhi-js-backend)
 
-Express API — PostgreSQL + MongoDB. **Runs in Docker** (API + both databases).
+Express API — PostgreSQL + MongoDB + Redis (BullMQ). **Runs in Docker** (API + databases).
+
+**Project scope and three-repo layout:** [docs/PROJECT_AND_SCOPE.md](docs/PROJECT_AND_SCOPE.md)
 
 ## Requirements
 
