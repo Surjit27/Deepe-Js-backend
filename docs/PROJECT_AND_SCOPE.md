@@ -110,6 +110,28 @@ Optional Node-on-host dev: Node 20+, `npm run docker:db`, Redis up, `npm run dev
 2. New **portal entity** → Prisma migration here; expose route; then Frontend page/service.
 3. Contract versioning → treat Python OpenAPI + `app/contracts/` as the HTTP truth for worker payloads.
 
+## Documentation map
+
+| Document | Where |
+|----------|--------|
+| **Project & scope** (this file) | `docs/PROJECT_AND_SCOPE.md` in each of the three repos |
+| **Postgres / Mongo split, job handoff** | `Python-backend/docs/SCHEMA_ARCHITECTURE.md` |
+| **Runbooks** | Each repo’s `README.md` |
+
+When system scope changes, update the matching sections in **all three** `PROJECT_AND_SCOPE.md` copies and bump the *Last updated* line below.
+
+## Local Git identity (Aazhi clones only)
+
+The three repos are often siblings under one folder (for example `Personal projects/Aazhi/`). Use **repo-local** Git config in each clone so other folders on the machine keep their own `user.name` / `user.email`:
+
+```bash
+cd backend   # repeat in Frontend/ and Python-backend/
+git config user.name "Surjit27"
+git config user.email "billionfolds@gmail.com"
+```
+
+This does **not** modify global Git configuration.
+
 ---
 
-*Last updated: 2026-11-24 — keep in sync with sibling copies in `Frontend/docs/` and `Python-backend/docs/` when system scope changes.*
+*Last updated: 2026-11-25 — keep in sync with sibling copies in `Frontend/docs/` and `Python-backend/docs/` when system scope changes.*
