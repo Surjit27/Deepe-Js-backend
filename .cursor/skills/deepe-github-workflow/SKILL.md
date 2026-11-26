@@ -1,10 +1,10 @@
 ---
 name: deepe-github-workflow
 description: >-
-  Deepe monorepo GitHub policy: three repos (Deepe, Deepe-Js-backend,
-  Deepe-agent-backend), branch protection, PR + issue pairing. Use when opening
-  PRs, pushing code, configuring GitHub, or working across frontend, Node API,
-  or Python AI worker repos.
+  Deepe monorepo GitHub policy: three repos (Aazhi/Deepe, Deepe-Js-backend,
+  Deepe-agent-backend), PR + issue pairing. Use when opening PRs, pushing code,
+  configuring GitHub, or working across frontend, Node API, or Python AI worker
+  repos.
 ---
 
 # Deepe GitHub workflow
@@ -15,57 +15,58 @@ description: >-
 
 | Repo | Purpose | Default integration branch |
 |------|---------|----------------------------|
-| [Surjit27/Deepe](https://github.com/Surjit27/Deepe) | Client/admin frontend (Vite/React) | `develop` (release via `main`) |
-| [Surjit27/Deepe-Js-backend](https://github.com/Surjit27/Deepe-Js-backend) | Node API, Prisma, tenant schemas | `develop` |
+| [Surjit27/Aazhi](https://github.com/Surjit27/Aazhi) | Client/admin frontend (Vite/React) | `main` |
+| [Surjit27/Deepe-Js-backend](https://github.com/Surjit27/Deepe-Js-backend) | Node API, Prisma, tenant schemas | `main` |
 | [Surjit27/Deepe-agent-backend](https://github.com/Surjit27/Deepe-agent-backend) | Python FastAPI AI worker (`ai` schema) | `main` |
 
 Local paths (typical): `Frontend/`, `backend/`, `Python-backend/` under the Aazhi/Deepe workspace.
 
-## Branch protection (configured)
+## Branch protection (current policy)
 
-On all three repos:
+**Approving reviews are not required** for now. Owner (**Surjit27**) may:
 
-- **`main`**: no direct pushes or merges; changes only through a **pull request** with **≥ 1 approving review**; conversation resolution required; admins included (`enforce_admins`).
-- **`develop`** (Deepe + Deepe-Js-backend only): same rules as `main`.
+- Push to **`main`** when the user asks (e.g. docs, small fixes), or
+- Merge PRs with **`gh pr merge`** without a separate approver account.
 
-Repository ruleset: **Require PR and 1 approval** (deletion and non-fast-forward blocked).
+Optional rulesets on GitHub may exist but are **disabled** or minimal—do not block on “wait for approval.”
 
-Agents must **not** push to `main` or `develop`; use feature branches and open PRs.
+For larger features, still prefer **feature branch → PR → merge** for history and review, but **no mandatory second-account approval** (no billionfolds-code step).
 
 ## When you open a PR
 
 Do this **every time**, in order:
 
-1. **Branch** off the correct base (`develop` for Deepe + Deepe-Js-backend unless user says otherwise; `main` for Deepe-agent-backend).
+1. **Branch** off **`main`** unless the user specifies another base.
 2. **Commit and push** the feature branch; open PR with summary + test plan.
-3. **Create a GitHub issue** in the **same repo** as the PR (or Deepe for cross-cutting frontend+backend work, with links to both PRs).
+3. **Create a GitHub issue** in the **same repo** as the PR (or Aazhi for cross-cutting frontend+backend work, with links to both PRs).
    - Title: short feature/fix name.
    - Body must include:
-     - **`Repo:`** `Deepe` | `Deepe-Js-backend` | `Deepe-agent-backend`
+     - **`Repo:`** `Aazhi` | `Deepe-Js-backend` | `Deepe-agent-backend`
      - **PR link(s)** (all related repos if multi-repo change)
      - Summary + test plan checklist
-   - Labels when available: `enhancement` or `bug`, `area: frontend` / backend area, `status: in progress` until merged; then close with comment linking the merged PR.
+   - Labels when available: `enhancement` or `bug`, area labels, `status: in progress` until merged; then close with comment linking the merged PR.
 4. **Cross-link**: comment on the PR with `Fixes #N` or `Relates to #N`; comment on the issue with the PR URL.
 
-Multi-repo features: one issue per repo **or** one Deepe epic issue listing each repo and PR—prefer one issue per repo for clarity.
+Multi-repo features: one issue per repo **or** one epic issue listing each repo and PR—prefer one issue per repo for clarity.
 
 ## Merge expectations
 
-- Wait for **one approval** (human or designated reviewer); do not merge via direct push.
-- If protection blocks merge, fix reviews or CI; do not bypass rulesets.
+- Merge when **CI is green** (if configured) and the user wants the change landed.
+- **No required approving review**; use `gh pr merge` as Surjit27.
+- Resolve conflicts on the PR branch before merge.
 
 ## gh examples
 
 ```bash
-# Issue with repo callout (Deepe frontend)
-gh issue create --repo Surjit27/Deepe \
+# Issue with repo callout (frontend)
+gh issue create --repo Surjit27/Aazhi \
   -t "Short title" \
   -l enhancement -l "status: in progress" -l "area: frontend" \
   -b "$(cat <<'EOF'
-Repo: Deepe
+Repo: Aazhi
 
 ## PR
-- 
+-
 
 ## Summary
 -
@@ -75,11 +76,10 @@ Repo: Deepe
 EOF
 )"
 
-# Node backend PR base develop
-gh pr create --repo Surjit27/Deepe-Js-backend --base develop --head feat/my-branch \
-  --title "..." --body "..."
+# Merge without approval workflow
+gh pr merge <NUMBER> --repo Surjit27/Deepe-Js-backend --merge
 ```
 
 ## Related user rules
 
-Follow the user's `creating-pull-requests` rule for git status/diff/log before PR creation. This skill adds **mandatory issue creation** and **repo naming** on top.
+Follow the user's `creating-pull-requests` rule for git status/diff/log before PR creation. This skill adds **issue creation** and **repo naming** on top.
