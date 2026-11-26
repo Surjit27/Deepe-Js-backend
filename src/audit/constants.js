@@ -12,6 +12,11 @@ export const AUDIT_ACTION = {
   ROLE_CREATED: 'role.created',
   /** One row when the client tab successfully opens an impersonation session. */
   IMPERSONATION: 'impersonation',
+  PERSONAL_SETTINGS_UPDATED: 'personal_settings.updated',
+  PASSWORD_CHANGED: 'password.changed',
+  TWO_FACTOR_ENABLED: 'two_factor.enabled',
+  TWO_FACTOR_DISABLED: 'two_factor.disabled',
+  LOGIN_TWO_FACTOR_FAILED: 'login.two_factor.failed',
   EMAIL_SETTINGS_UPDATED: 'settings.updated',
   EMAIL_PROVIDER_CREATED: 'provider.created',
   EMAIL_PREVIEW_SAVED: 'preview.saved',
