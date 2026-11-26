@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { createRole, findRoleByKey, listRoles, toPublicRole } from '../repositories/roles.repository.js'
+import { permissionsForNewRole } from './rolePermissions.service.js'
 import { findUserCredentialsByEmail } from '../repositories/accountSecurity.repository.js'
 import { verifyTwoFactorForUser } from './accountSecurity.service.js'
 import {
@@ -332,7 +333,12 @@ export async function createRoleCatalog({ key, label, portal }, actorRole) {
     err.status = 409
     throw err
   }
-  const row = await createRole({ key: roleKey, label: roleLabel, portal })
+  const row = await createRole({
+    key: roleKey,
+    label: roleLabel,
+    portal,
+    permissions: permissionsForNewRole(portal, roleKey),
+  })
   return toPublicRole(row)
 }
 

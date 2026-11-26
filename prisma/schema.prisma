@@ -32,11 +32,12 @@ model User {
 }
 
 model Role {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key       String   @unique @db.VarChar(40)
-  label     String   @db.VarChar(80)
-  portal    String   @db.VarChar(20)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String   @unique @db.VarChar(40)
+  label       String   @db.VarChar(80)
+  portal      String   @db.VarChar(20)
+  permissions Json     @default("[]") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("roles")
 }
@@ -130,6 +131,29 @@ model AuditEvent {
   @@index([domain, createdAt(sort: Desc)], map: "idx_audit_events_domain_created")
   @@index([createdAt(sort: Desc)], map: "idx_audit_events_created")
   @@map("audit_events")
+}
+
+model FeatureFlag {
+  key            String   @id @db.VarChar(64)
+  label          String   @db.VarChar(120)
+  description    String   @default("")
+  navPath        String   @default("") @map("nav_path") @db.VarChar(120)
+  defaultEnabled Boolean  @default(true) @map("default_enabled")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("feature_flags")
+}
+
+model ClientFeatureFlagOverride {
+  clientUserId String   @map("client_user_id") @db.Uuid
+  flagKey      String   @map("flag_key") @db.VarChar(64)
+  enabled      Boolean
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([clientUserId, flagKey])
+  @@map("client_feature_flag_overrides")
 }
 
 model ClientSchemaRegistry {
