@@ -135,4 +135,4 @@ This does **not** modify global Git configuration.
 
 ---
 
-*Last updated: 2026-11-26 — keep in sync with sibling copies in `Frontend/docs/` and `Python-backend/docs/` when system scope changes.*
+*Last updated: 2026-11-27 — keep in sync with sibling copies in `Frontend/docs/` and `Python-backend/docs/` when system scope changes.*
