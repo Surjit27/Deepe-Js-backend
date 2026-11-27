@@ -3,7 +3,8 @@
 Express API — PostgreSQL + MongoDB + Redis (BullMQ). **Runs in Docker** (API + databases).
 
 **Project scope and three-repo layout:** [docs/PROJECT_AND_SCOPE.md](docs/PROJECT_AND_SCOPE.md)  
-**Local dev issues:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+**Local dev issues:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)  
+**GitHub integration branch:** `main`.
 
 ## Requirements
 
