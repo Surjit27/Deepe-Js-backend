@@ -118,6 +118,7 @@ Optional Node-on-host dev: Node 20+, `npm run docker:db`, Redis up, `npm run dev
 | **Postgres / Mongo split, job handoff** | `Python-backend/docs/SCHEMA_ARCHITECTURE.md` |
 | **Runbooks** | Each repo’s `README.md` |
 | **Local dev issues** | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) |
+| **Env checklist** | [ENV_CHECKLIST.md](./ENV_CHECKLIST.md) |
 
 When system scope changes, update the matching sections in **all three** `PROJECT_AND_SCOPE.md` copies and bump the *Last updated* line below.
 
@@ -128,11 +129,11 @@ The three repos are often siblings under one folder (for example `Personal proje
 ```bash
 cd backend   # repeat in Frontend/ and Python-backend/
 git config user.name "Surjit27"
-git config user.email "billionfolds@gmail.com"
+git config user.email "128356922+Surjit27@users.noreply.github.com"
 ```
 
 This does **not** modify global Git configuration.
 
 ---
 
-*Last updated: 2026-11-27 — keep in sync with sibling copies in `Frontend/docs/` and `Python-backend/docs/` when system scope changes.*
+*Last updated: 2026-11-28 — keep in sync with sibling copies in `Frontend/docs/` and `Python-backend/docs/` when system scope changes.*
