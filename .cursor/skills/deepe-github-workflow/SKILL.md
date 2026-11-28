@@ -21,6 +21,8 @@ description: >-
 
 Local paths (typical): `Frontend/`, `backend/`, `Python-backend/` under the Aazhi/Deepe workspace.
 
+**Commit email for contribution graph:** use `128356922+Surjit27@users.noreply.github.com` in repo-local `git config` (see each `docs/PROJECT_AND_SCOPE.md`).
+
 ## Branch protection (current policy)
 
 **Approving reviews are not required** for now. Owner (**Surjit27**) may:
